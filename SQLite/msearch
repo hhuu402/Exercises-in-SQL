@@ -1,0 +1,122 @@
+#!/usr/bin/python3
+import sqlite3,sys
+
+if len(sys.argv) == 1:
+  print("Usage: ", sys.argv[0], "SUBSTRING-1 ... SUBSTRING-N")
+  sys.exit(1)
+
+s = []
+for c in sys.argv:
+  s.append(str(c))
+
+s.pop(0)
+
+con = sqlite3.connect('a2.db')
+  
+cur1 = con.cursor()
+
+size = 0
+
+#write a for loop that builds the query
+
+base_query = '''SELECT distinct m.title, m.year, m.content_rating, r.imdb_score, group_concat(d.name) as director, group_concat(a1.name) as actor
+from movie m
+join rating r on (r.movie_id = m.id)
+join acting a on (a.movie_id = m.id)
+join actor a1 on (a1.id = a.actor_id)
+left join director d on (d.id = m.director_id)
+GROUP BY m.title, m.year, m.content_rating, r.imdb_score, d.name'''
+
+query = '''
+SELECT title, year, content_rating, imdb_score from
+'''
+
+sort = '''
+group by title, year, content_rating, imdb_score
+order by year desc, imdb_score desc, title asc
+'''
+
+joiner1 = ''' where'''
+joiner2 = ''' and '''
+
+while size < len(s):
+  condition = '''(title like '%'''+str(s[size])+'''%'
+  or actor like '%'''+str(s[size])+'''%'
+  or director like '%'''+str(s[size])+'''%')
+  '''
+
+  if size == 0:
+    query = query + "(" + base_query + ")" + joiner1 + condition
+  else:
+    query = query + joiner2 + condition
+
+  size = size + 1
+
+query = query + sort
+cur1.execute(query)
+
+cur2 = con.cursor()
+
+
+count = 1
+while True:
+  tup = cur1.fetchone()
+  
+  if tup == None:
+    break
+
+  name = tup[0]
+
+  if name.find("'") != -1:
+    query2 = """select g.genre from movie m join genre g on (g.movie_id = m.id)
+    where m.title = "{}"
+    """.format(name)
+
+  else:
+    query2 = '''select g.genre from movie m join genre g on (g.movie_id = m.id)
+    where m.title = '{}'
+    '''.format(name)
+
+  cur2.execute(query2)
+  genre = cur2.fetchall()
+
+  genre_str = ""
+  for get in genre:
+    j = str(get)
+    j = j.strip("[('',)]")
+
+    if not genre_str:
+      genre_str = j
+    else:
+      genre_str = genre_str + "," + j
+
+  x, y, z, a = tup
+
+  print_list = []
+  print_list.append(x)
+
+  if y != None:
+    print_list.append(y)
+
+  if z != None:
+    print_list.append(z)
+
+  if a != None:
+    print_list.append(float(a))
+
+
+  if len(print_list) == 1:
+    print('{}. {} () [{}]'.format(count, print_list[0], genre_str))
+
+  elif len(print_list) == 2:
+    print('{}. {} ({}) [{}]'.format(count, x,print_list[1], genre_str))
+    
+  elif len(print_list) == 3:
+    print('{}. {} ({}, {}) [{}]'.format(count, x,print_list[1],print_list[2], genre_str))
+
+  else:
+    print('{}. {} ({}, {}, {}) [{}]'.format(count, x, y, z, float(a), genre_str))
+    
+  count = count+1
+
+con.close()

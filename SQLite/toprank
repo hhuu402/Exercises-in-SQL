@@ -1,0 +1,87 @@
+#!/usr/bin/python3
+
+import sqlite3,sys
+
+if len(sys.argv) != 3 :
+  print("Usage:",sys.argv[0],"Genres MinRating")
+  sys.exit(1)
+
+my_genre = sys.argv[1].split('&')
+rating = float(sys.argv[2])
+
+con = sqlite3.connect('a2.db')
+cur = con.cursor()
+
+query = """SELECT DISTINCT m.title, m.year, m.content_rating, m.lang, r.imdb_score, r.num_voted_users, group_concat(g.genre) as genre
+from movie m
+left join rating r on (r.movie_id = m.id)
+left join genre g on (g.movie_id = m.id)
+where r.imdb_score >= {}
+""".format(rating)
+
+sort = """
+group by m.title
+"""
+
+order = """order by r.imdb_score desc, r.num_voted_users desc"""
+
+joiner = """ having """
+joiner2 = """ and """
+
+query = query + sort
+
+if sys.argv[1] != "":
+  sub_count = 0
+  for x in my_genre:
+    condition = '''group_concat(genre) like '%'''+str(x)+'''%'
+    '''
+    if sub_count == 0:
+      query = query + joiner + condition
+    else:
+      query = query + joiner2 + condition
+
+    sub_count = sub_count + 1
+
+  query = query + order
+
+  cur.execute(query)
+
+else:
+  query = query + order
+  cur.execute(query)
+
+count = 1
+
+while True:
+  tup = cur.fetchone()
+  if tup == None:
+    break
+
+  title, year, content, lang, imdb, votes, fod = tup
+  imdb = float(imdb)
+
+  check_y = 0
+
+  print_list = []
+  if year != None:
+    print_list.append(year)
+    check_y = 1
+
+  if content != None:
+    print_list.append(content)
+
+  if len(print_list) == 0:
+    print('{}. {} ({}) [{}, {}]'.format(count, title, lang, imdb, votes))
+
+  elif len(print_list) == 1:
+    if check_y == 0:
+      print('{}. {} ({}, {}) [{}, {}]'.format(count, title, content, lang, imdb, votes))
+    else:
+      print('{}. {} ({}, {}) [{}, {}]'.format(count, title, year, lang, imdb, votes))      
+
+  elif len(print_list) == 2:
+      print('{}. {} ({}, {}, {}) [{}, {}]'.format(count, title, year, content, lang, imdb, votes))  
+
+  count = count + 1
+
+con.close()
